@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sync Master: Real Dancers Edition</title>
+    <style>
+        :root {
+            --bg-color: #0f0f13;
+            --panel-color: #1e1e24;
+            --accent-color: #00f0ff;
+            --success-color: #39ff14;
+            --fail-color: #ff3131;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .screen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            max-width: 800px;
+            width: 100%;
+            background: var(--panel-color);
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .active { display: flex; }
+
+        h1 { font-size: 2.5rem; margin-bottom: 10px; color: var(--accent-color); text-transform: uppercase; letter-spacing: 2px; }
+        p { color: #aaa; line-height: 1.6; }
+
+        .btn {
+            background: var(--accent-color);
+            color: black;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin: 10px;
+        }
+        .btn:hover { transform: scale(1.05); box-shadow: 0 0 15px var(--accent-color); }
+        
+        .btn-lock {
+            background: var(--success-color);
+            color: black;
+            font-size: 1.4rem;
+            padding: 15px 45px;
+            box-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
+            margin-top: 20px;
+        }
+        .btn-lock:hover { box-shadow: 0 0 25px var(--success-color); }
+        .btn-lock:active { transform: scale(0.98); }
+
+        .difficulty-container { margin: 25px 0; }
+        .btn-diff { background: #333; color: white; border: none; padding: 10px 20px; border-radius: 20px; margin: 0 5px; cursor: pointer;}
+        .btn-diff.selected { background: white; color: black; box-shadow: 0 0 10px white; }
+
+        .video-grid {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .video-wrapper {
+            flex: 1;
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 3px solid #333;
+            aspect-ratio: 16 / 9;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .video-wrapper.pulse-success { border-color: var(--success-color); box-shadow: 0 0 20px var(--success-color); }
+        .video-wrapper.pulse-fail { border-color: var(--fail-color); box-shadow: 0 0 20px var(--fail-color); }
+        video { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .label { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; z-index: 10; }
+
+        .slider-box { width: 100%; margin: 25px 0 10px; text-align: center; }
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 80%;
+            background: #333;
+            height: 8px;
+            border-radius: 5px;
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+            box-shadow: 0 0 10px var(--accent-color);
+        }
+
+        #status { font-size: 1.4rem; font-weight: bold; margin-top: 10px; min-height: 35px; letter-spacing: 1px; }
+    </style>
+</head>
+<body>
+
+    <div id="startScreen" class="screen active">
+        <h1>Sync Master</h1>
+        <p>Two dancers, performing the exact same routine, but they're out of rhythm. Your job is to bring them into perfect alignment.</p>
+        
+        <h3>How to Play:</h3>
+        <p>Drag the slider to alter the playback rate of Dancer B. <br>
+           The speed changes dynamically and stays exactly where you leave it. <br>
+           Once you believe they match up perfectly in stride, hit the <b>LOCK SYNC</b> button!</p>
+
+        <div class="difficulty-container">
+            <h3>Select Difficulty:</h3>
+            <button class="btn btn-diff selected" onclick="setDifficulty('easy', this)">Easy</button>
+            <button class="btn btn-diff" onclick="setDifficulty('medium', this)">Medium</button>
+            <button class="btn btn-diff" onclick="setDifficulty('hard', this)">Hard</button>
+        </div>
+
+        <button class="btn" id="startBtn" onclick="startGame()">START GAME 🔊</button>
+    </div>
+
+    <div id="gameScreen" class="screen">
+        <div class="video-grid">
+            <div class="video-wrapper" id="wrapperA">
+                <span class="label">Dancer A (Leader)</span>
+                <video id="videoA" src="videoA.mp4" loop playsinline crossorigin="anonymous"></video>
+            </div>
+            <div class="video-wrapper" id="wrapperB">
+                <span class="label">Dancer B (Adjustable)</span>
+                <video id="videoB" src="videoB.mp4" loop muted playsinline crossorigin="anonymous"></video>
+            </div>
+        </div>
+
+        <div class="slider-box">
+            <div style="display: flex; justify-content: space-between; width: 80%; margin: 0 auto 10px; color: #777;">
+                <span>Slower ⏪</span>
+                <span>⏩ Faster</span>
+            </div>
+            <input type="range" id="syncSlider" min="0.5" max="1.5" step="0.01" value="1">
+            <p>Slider: <span id="sliderVal" style="color:var(--accent-color)">1.00x</span> speed</p>
+        </div>
+
+        <div id="status">WATCH CAREFULLY...</div>
+
+        <button class="btn btn-lock" onclick="checkManualSync()">🔒 LOCK SYNC</button>
+    </div>
+
+    <div id="winScreen" class="screen">
+        <h1 style="color: var(--success-color);">✨ PERFECT SYNC! ✨</h1>
+        <p>Incredible rhythm! You successfully synced the choreographies.</p>
+        <button class="btn" onclick="resetToMenu()">Play Again</button>
+    </div>
+
+    <script>
+        const videoA = document.getElementById('videoA');
+        const videoB = document.getElementById('videoB');
+        const slider = document.getElementById('syncSlider');
+        const sliderVal = document.getElementById('sliderVal');
+        const statusText = document.getElementById('status');
+        
+        const wrapperA = document.getElementById('wrapperA');
+        const wrapperB = document.getElementById('wrapperB');
+
+        let currentDifficulty = 'easy';
+        const configs = {
+            easy: { offset: 2.0, threshold: 0.35 },
+            medium: { offset: 3.5, threshold: 0.18 },
+            hard: { offset: -4.0, threshold: 0.06 }
+        };
+
+        // USER ANCHOR TIMESTAMPS
+        const videoA_StartCue = 2.0; 
+        const videoB_StartCue = 0.0; 
+
+        function setDifficulty(diff, buttonElement) {
+            currentDifficulty = diff;
+            document.querySelectorAll('.btn-diff').forEach(btn => btn.classList.remove('selected'));
+            buttonElement.classList.add('selected');
+        }
+
+        function startGame() {
+            document.getElementById('startScreen').classList.remove('active');
+            document.getElementById('gameScreen').classList.add('active');
+            
+            statusText.innerText = "STREAM RUNNING. ANALYZE VISUALS...";
+            statusText.style.color = "#ffffff";
+            wrapperA.className = "video-wrapper";
+            wrapperB.className = "video-wrapper";
+
+            const config = configs[currentDifficulty];
+            
+            videoA.muted = false;
+            videoB.muted = true;
+
+            // Apply your distinct cue marks + the artificial game alignment offset
+            videoA.currentTime = videoA_StartCue; 
+            videoB.currentTime = videoB_StartCue + config.offset;
+            
+            slider.value = 1;
+            sliderVal.innerText = '1.00x';
+            videoB.playbackRate = 1;
+
+            videoA.play();
+            videoB.play();
+        }
+
+        slider.addEventListener('input', (e) => {
+            const speed = parseFloat(e.target.value);
+            videoB.playbackRate = speed;
+            sliderVal.innerText = speed.toFixed(2) + 'x';
+        });
+
+        function checkManualSync() {
+            const config = configs[currentDifficulty];
+            
+            // Calculate the physical video time difference relative to their real sync marks
+            const visualDifference = videoB_StartCue - videoA_StartCue; // 0.0 - 2.0 = -2.0
+            const normalizedTimeB = videoB.currentTime - visualDifference;
+            
+            const timeDiff = Math.abs(videoA.currentTime - normalizedTimeB);
+
+            if (timeDiff <= config.threshold) {
+                statusText.innerText = "SUCCESS! RHYTHM LOCK MATCHED!";
+                statusText.style.color = "var(--success-color)";
+                wrapperA.className = "video-wrapper pulse-success";
+                wrapperB.className = "video-wrapper pulse-success";
+
+                setTimeout(() => {
+                    endGame(true);
+                }, 1200);
+            } else {
+                statusText.innerText = `MISSED! OUT OF SYNC BY ${timeDiff.toFixed(2)}s`;
+                statusText.style.color = "var(--fail-color)";
+                wrapperA.className = "video-wrapper pulse-fail";
+                wrapperB.className = "video-wrapper pulse-fail";
+
+                setTimeout(() => {
+                    if (document.getElementById('gameScreen').classList.contains('active')) {
+                        statusText.innerText = "WATCH CAREFULLY...";
+                        statusText.style.color = "#ffffff";
+                        wrapperA.className = "video-wrapper";
+                        wrapperB.className = "video-wrapper";
+                    }
+                }, 1500);
+            }
+        }
+
+        function endGame(won) {
+            videoA.pause();
+            videoB.pause();
+
+            if (won) {
+                document.getElementById('gameScreen').classList.remove('active');
+                document.getElementById('winScreen').classList.add('active');
+            }
+        }
+
+        function resetToMenu() {
+            document.getElementById('winScreen').classList.remove('active');
+            document.getElementById('startScreen').classList.add('active');
+        }
+    </script>
+</body>
+</html>
