@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sync Master: Real Dancers Edition</title>
+    <title>Sync Master: Real Dancers & Freeze Edition</title>
     <style>
         :root {
             --bg-color: #0f0f13;
@@ -59,6 +59,16 @@
         }
         .btn:hover { transform: scale(1.05); box-shadow: 0 0 15px var(--accent-color); }
         
+        .btn-freeze {
+            background: #ffb703;
+            color: black;
+            font-size: 1rem;
+            padding: 10px 25px;
+            border-radius: 20px;
+            margin: 10px 0 20px;
+        }
+        .btn-freeze:hover { box-shadow: 0 0 15px #ffb703; }
+
         .btn-lock {
             background: var(--success-color);
             color: black;
@@ -122,12 +132,14 @@
 
     <div id="startScreen" class="screen active">
         <h1>Sync Master</h1>
-        <p>Two dancers, performing the exact same routine, but they're out of rhythm. Your job is to bring them into perfect alignment.</p>
+        <p>Two different video clips of real dancers performing the same choreography. Align their rhythms precisely.</p>
         
         <h3>How to Play:</h3>
-        <p>Drag the slider to alter the playback rate of Dancer B. <br>
-           The speed changes dynamically and stays exactly where you leave it. <br>
-           Once you believe they match up perfectly in stride, hit the <b>LOCK SYNC</b> button!</p>
+        <p>
+            • Drag the slider to alter the playback rate of Dancer B.<br>
+            • Use the <b>FREEZE</b> button to pause Dancer B until Dancer A catches up!<br>
+            • Once they match perfectly in stride, hit the <b>LOCK SYNC</b> button!
+        </p>
 
         <div class="difficulty-container">
             <h3>Select Difficulty:</h3>
@@ -160,6 +172,8 @@
             <p>Slider: <span id="sliderVal" style="color:var(--accent-color)">1.00x</span> speed</p>
         </div>
 
+        <button class="btn btn-freeze" id="freezeBtn" onclick="toggleFreezeB()">%CLASSROOM_PLAY% <b>⏸️ FREEZE DANCER B</b></button>
+
         <div id="status">WATCH CAREFULLY...</div>
 
         <button class="btn btn-lock" onclick="checkManualSync()">🔒 LOCK SYNC</button>
@@ -167,7 +181,7 @@
 
     <div id="winScreen" class="screen">
         <h1 style="color: var(--success-color);">✨ PERFECT SYNC! ✨</h1>
-        <p>Incredible rhythm! You successfully synced the choreographies.</p>
+        <p>Incredible rhythm! You successfully calculated the alignment vector manually.</p>
         <button class="btn" onclick="resetToMenu()">Play Again</button>
     </div>
 
@@ -177,6 +191,7 @@
         const slider = document.getElementById('syncSlider');
         const sliderVal = document.getElementById('sliderVal');
         const statusText = document.getElementById('status');
+        const freezeBtn = document.getElementById('freezeBtn');
         
         const wrapperA = document.getElementById('wrapperA');
         const wrapperB = document.getElementById('wrapperB');
@@ -188,9 +203,10 @@
             hard: { offset: -4.0, threshold: 0.06 }
         };
 
-        // USER ANCHOR TIMESTAMPS
+        // TARGET TIMESTAMPS AS PROVIDED
         const videoA_StartCue = 2.0; 
         const videoB_StartCue = 0.0; 
+        let isPausedB = false;
 
         function setDifficulty(diff, buttonElement) {
             currentDifficulty = diff;
@@ -212,28 +228,51 @@
             videoA.muted = false;
             videoB.muted = true;
 
-            // Apply your distinct cue marks + the artificial game alignment offset
+            // Seed timestamps using the precise cues + game balance offset parameters
             videoA.currentTime = videoA_StartCue; 
             videoB.currentTime = videoB_StartCue + config.offset;
             
             slider.value = 1;
             sliderVal.innerText = '1.00x';
             videoB.playbackRate = 1;
+            
+            isPausedB = false;
+            freezeBtn.innerHTML = "<b>⏸️ FREEZE DANCER B</b>";
 
             videoA.play();
             videoB.play();
         }
 
         slider.addEventListener('input', (e) => {
+            if (isPausedB) return; // Completely ignore slider inputs while frozen
             const speed = parseFloat(e.target.value);
             videoB.playbackRate = speed;
             sliderVal.innerText = speed.toFixed(2) + 'x';
         });
 
+        // Toggles freeze state by modifying playing configuration instead of slider value directly
+        function toggleFreezeB() {
+            if (!isPausedB) {
+                videoB.pause();
+                isPausedB = true;
+                freezeBtn.innerHTML = "<b>▶️ RESUME DANCER B</b>";
+                sliderVal.innerText = 'FROZEN (0.00x)';
+            } else {
+                videoB.play();
+                isPausedB = false;
+                freezeBtn.innerHTML = "<b>⏸️ FREEZE DANCER B</b>";
+                
+                // Read from the active trackbar configuration position to restore rate cleanly
+                const restoredSpeed = parseFloat(slider.value);
+                videoB.playbackRate = restoredSpeed;
+                sliderVal.innerText = restoredSpeed.toFixed(2) + 'x';
+            }
+        }
+
         function checkManualSync() {
             const config = configs[currentDifficulty];
             
-            // Calculate the physical video time difference relative to their real sync marks
+            // Normalize Video B times to offset original raw file frame index layout offsets
             const visualDifference = videoB_StartCue - videoA_StartCue; // 0.0 - 2.0 = -2.0
             const normalizedTimeB = videoB.currentTime - visualDifference;
             
